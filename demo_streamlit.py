@@ -28,10 +28,27 @@ with st.sidebar:
     st.title("🏠 DANH MỤC DỊCH VỤ")
     menu = st.radio(
         "Vui lòng chọn tính năng:",
-        ["🌟 Giới thiệu hệ thống", "📊 Độ tin cậy của AI", "🔮 Định giá Bất động sản", "⚠️ Kiểm tra rủi ro giá", "👥 Đội ngũ phát triển"]
+        ["🌟 Giới thiệu hệ thống", "📊 Độ tin cậy của AI", "🔮 Định giá Bất động sản", "⚠️ Kiểm tra rủi ro giá"]
     )
+    
+    # Đưa thông tin nhóm xuống cố định ở Sidebar
+    st.markdown("---")
+    st.subheader("👥 Đội ngũ phát triển")
+    st.markdown("""
+    **1. Huỳnh Lê Xuân Ánh**  
+    *Kỹ sư Dữ liệu & Phát triển AI*
+    
+    **2. Nguyễn Thị Tuyết Vân**  
+    *Chuyên gia Xử lý Dữ liệu lớn*
+    
+    **3. Đặng Đức Duy**  
+    *Chuyên gia Phân tích Rủi ro*
+    
+    ---
+    *Dự án thuộc khuôn khổ môn học Machine Learning.*
+    """)
 
-# Giới thiệu hệ thống (Thay cho Bài toán kinh doanh)
+# Giới thiệu hệ thống
 if menu == "🌟 Giới thiệu hệ thống":
     st.title("🌟 Hệ thống Thẩm định & Đánh giá rủi ro Bất động sản")
     st.write("""
@@ -51,7 +68,7 @@ if menu == "🌟 Giới thiệu hệ thống":
     - Bảo vệ tài sản và quyết định đầu tư của bạn.
     """)
 
-# Độ tin cậy (Thay cho Đánh giá & Báo cáo)
+# Độ tin cậy
 elif menu == "📊 Độ tin cậy của AI":
     st.title("📊 Độ tin cậy & Năng lực của Hệ thống")
     st.write("Hệ thống của chúng tôi được huấn luyện trên dữ liệu thực tế tại TP.HCM, trải qua quá trình kiểm định nghiêm ngặt để đảm bảo độ chính xác cao nhất cho khách hàng.")
@@ -77,7 +94,7 @@ elif menu == "📊 Độ tin cậy của AI":
     *Chỉ khi vượt qua được các bài kiểm tra này, giao dịch mới được hệ thống đánh giá là an toàn.*
     """)
 
-# Định giá Bất động sản (Thay cho Dự đoán giá nhà)
+# Định giá Bất động sản
 elif menu == "🔮 Định giá Bất động sản":
     st.title("🔮 Định giá Bất động sản")
     st.markdown("### Nhập thông tin căn nhà bạn muốn định giá")
@@ -153,7 +170,7 @@ elif menu == "🔮 Định giá Bất động sản":
         except Exception as e:
             st.error("⚠️ Hệ thống đang bận hoặc có lỗi xảy ra, vui lòng thử lại sau.")
 
-# Kiểm tra rủi ro (Thay cho Phát hiện bất thường)
+# Kiểm tra rủi ro
 elif menu == "⚠️ Kiểm tra rủi ro giá":
     st.title("⚠️ Kiểm tra rủi ro giao dịch")
     st.markdown("""
@@ -202,7 +219,7 @@ elif menu == "⚠️ Kiểm tra rủi ro giá":
         phap_ly_map = {"Sổ hồng": 5, "Sổ đỏ": 4, "Đang hoàn thiện": 2}
         price_m2 = gia_ban / dien_tich
         
-        # Logic tính toán (Giữ nguyên)
+        # Logic tính toán
         mean_price = 6.5
         std_price = 9.95
         z_score = abs(gia_ban - mean_price) / std_price
@@ -303,24 +320,3 @@ elif menu == "⚠️ Kiểm tra rủi ro giá":
             
         except Exception as e:
             st.error("⚠️ Vui lòng kiểm tra lại các thông tin đã nhập.")
-
-# Team Info
-else:
-    st.title("👥 Đội ngũ phát triển")
-    
-    st.write("""
-    Hệ thống được nghiên cứu và phát triển bởi đội ngũ đam mê ứng dụng Trí tuệ nhân tạo vào giải quyết các bài toán thực tế của xã hội.
-    
-    ### 👨‍💻 Thành viên dự án:
-    1. **Huỳnh Lê Xuân Ánh** - *Kỹ sư Dữ liệu & Phát triển Mô hình AI*
-    2. **Nguyễn Thị Tuyết Vân** - *Chuyên gia Xử lý Dữ liệu lớn (Big Data)*
-    3. **Đặng Đức Duy** - *Chuyên gia Phân tích Rủi ro & Trải nghiệm người dùng*
-    
-    ### ⚙️ Công nghệ nền tảng:
-    Hệ thống của chúng tôi được xây dựng trên các công nghệ tiên tiến nhất hiện nay:
-    - Lõi Trí tuệ nhân tạo (Machine Learning) để học hỏi từ hàng chục ngàn giao dịch thực tế.
-    - Công nghệ xử lý Dữ liệu lớn (Big Data) giúp phân tích thị trường theo thời gian thực.
-    - Giao diện tương tác thông minh, thân thiện với người dùng.
-    
-    *Dự án thuộc khuôn khổ môn học Machine Learning.*
-    """)
