@@ -45,7 +45,7 @@ with st.sidebar:
     *Chuyên gia Phân tích Rủi ro*
     
     ---
-    *Dự án thuộc khuôn khổ môn học Machine Learning.*
+    *Gmail: projectnhom7@gmail.com*
     """)
 
 # Giới thiệu hệ thống
