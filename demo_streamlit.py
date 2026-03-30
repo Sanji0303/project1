@@ -388,153 +388,406 @@ elif menu == "🔮 Định giá Bất động sản":
                 st.error(f"❌ Lỗi khi xử lý file: {str(e)}")
                 st.info("Vui lòng kiểm tra lại định dạng file CSV hoặc tải file mẫu để tham khảo.")
 
-# Kiểm tra rủi ro
+# Kiểm tra rủi ro (Thay cho Phát hiện bất thường)
 elif menu == "⚠️ Kiểm tra rủi ro giá":
     st.title("⚠️ Kiểm tra rủi ro giao dịch")
-    st.markdown("""
-    ### Đánh giá mức độ an toàn của giá bán
-    Bạn đang định mua hoặc bán một căn nhà? Hãy nhập mức giá đó vào đây. 
-    Hệ thống AI sẽ đối chiếu với hàng ngàn giao dịch khác để cảnh báo nếu mức giá này có dấu hiệu "bất thường" (thổi giá hoặc quá rẻ do vướng pháp lý).
-    """)
     
-    with st.form("anomaly_form"):
-        st.subheader("📋 Thông tin giao dịch cần kiểm tra")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            dien_tich = st.number_input("🏠 Diện tích (m²)", min_value=10.0, max_value=500.0, value=75.0, step=5.0)
-            gia_ban = st.number_input("💰 Giá đang rao bán (tỷ đồng)", min_value=0.5, max_value=500.0, value=7.0, step=0.5)
-            
-        with col2:
-            loai_hinh = st.selectbox("🏢 Loại hình", ["Nhà riêng", "Căn hộ", "Đất nền"])
-            quan = st.selectbox("📍 Khu vực", ["Quận Gò Vấp", "Quận Phú Nhuận", "Quận Bình Thạnh"])
-            
-        with col3:
-            dac_diem = st.selectbox("📍 Vị trí đường/hẻm", ["Mặt tiền", "Hẻm xe hơi", "Hẻm nhỏ"])
-            so_phong_ngu = st.number_input("🛏️ Số phòng ngủ", min_value=1, max_value=10, value=3, step=1)
-        
-        # Map giá trị cho model
-        loai_hinh_map = {"Nhà riêng": 0, "Căn hộ": 1, "Đất nền": 2}
-        quan_map = {"Quận Gò Vấp": 0, "Quận Phú Nhuận": 1, "Quận Bình Thạnh": 2}
-        dac_diem_map = {"Mặt tiền": 7, "Hẻm xe hơi": 6, "Hẻm nhỏ": 2}
-        
-        # Thông số phụ (ẩn bớt sự phức tạp)
-        with st.expander("Nhấn vào đây nếu bạn muốn nhập thêm chi tiết (Không bắt buộc)"):
-            col4, col5, col6 = st.columns(3)
-            with col4:
-                chieu_ngang = st.number_input("Chiều rộng (m)", min_value=2.0, max_value=30.0, value=5.0, step=0.5, key="anom_width")
-                chieu_dai = st.number_input("Chiều dài (m)", min_value=3.0, max_value=50.0, value=15.0, step=0.5, key="anom_length")
-            with col5:
-                tong_tang = st.number_input("Số tầng", min_value=1, max_value=10, value=2, key="anom_floor")
-                so_phong_ve_sinh = st.number_input("Số phòng vệ sinh", min_value=1, max_value=6, value=2, key="anom_bath")
-            with col6:
-                phap_ly = st.selectbox("Giấy tờ pháp lý", ["Sổ hồng", "Sổ đỏ", "Đang hoàn thiện"], key="anom_legal")
-        
-        submitted = st.form_submit_button("🔍 Phân tích rủi ro", type="primary")
+    # Tạo 2 tab: Nhập thủ công và Upload file
+    tab1, tab2 = st.tabs(["📝 Nhập thủ công", "📂 Upload file CSV (Kiểm tra hàng loạt)"])
     
-    if submitted:
-        phap_ly_map = {"Sổ hồng": 5, "Sổ đỏ": 4, "Đang hoàn thiện": 2}
-        price_m2 = gia_ban / dien_tich
+    # ==================== TAB 1: NHẬP THỦ CÔNG (GIỮ NGUYÊN CODE CŨ) ====================
+    with tab1:
+        st.markdown("""
+        ### Đánh giá mức độ an toàn của giá bán
+        Bạn đang định mua hoặc bán một căn nhà? Hãy nhập mức giá đó vào đây. 
+        Hệ thống AI sẽ đối chiếu với hàng ngàn giao dịch khác để cảnh báo nếu mức giá này có dấu hiệu "bất thường".
+        """)
         
-        # Logic tính toán
-        mean_price = 6.5
-        std_price = 9.95
-        z_score = abs(gia_ban - mean_price) / std_price
-        anomaly_zscore = z_score > 3
-        
-        anomaly_minmax = (price_m2 < 0.03) or (price_m2 > 0.5)
-        
-        p10, p90 = 0.08, 0.25
-        anomaly_percentile = (price_m2 < p10) or (price_m2 > p90)
-        
-        input_data = pd.DataFrame([{
-            "dien_tich": dien_tich,
-            "loai_hinh": loai_hinh_map[loai_hinh],
-            "giay_to_phap_ly": phap_ly_map[phap_ly],
-            "so_phong_ngu": so_phong_ngu,
-            "so_phong_ve_sinh": so_phong_ve_sinh,
-            "tong_so_tang": tong_tang,
-            "tinh_trang_noi_that": 2,
-            "dac_diem": dac_diem_map[dac_diem],
-            "chieu_ngang": chieu_ngang,
-            "chieu_dai": chieu_dai,
-            "e_Quận Gò Vấp": 1 if quan_map[quan] == 1 else 0,
-            "e_Quận Phú Nhuận": 1 if quan_map[quan] == 2 else 0
-        }])
-        
-        try:
-            pred_log = model.predict(input_data)[0]
-            pred_price = np.expm1(pred_log)
-            error = abs(gia_ban - pred_price)
+        with st.form("anomaly_form"):
+            st.subheader("📋 Thông tin giao dịch cần kiểm tra")
             
-            error_threshold = 0.387
-            anomaly_rf = error > error_threshold
+            col1, col2, col3 = st.columns(3)
             
-            anomaly_score = (0.4 * anomaly_rf + 0.2 * anomaly_zscore + 0.2 * anomaly_minmax + 0.2 * anomaly_percentile)
-            
-            st.markdown("---")
-            st.subheader("📊 Kết luận từ Hệ thống")
-            
-            if anomaly_score >= 0.5:
-                st.error("🚨 **CẢNH BÁO: MỨC GIÁ CÓ DẤU HIỆU BẤT THƯỜNG!** 🚨")
-                st.write("Giao dịch này tiềm ẩn rủi ro. Mức giá bạn nhập vào đang chênh lệch quá lớn so với giá trị thực tế của thị trường.")
-            else:
-                st.success("✅ **AN TOÀN: MỨC GIÁ HỢP LÝ** ✅")
-                st.write("Mức giá này phù hợp với mặt bằng chung của thị trường và các đặc điểm của căn nhà.")
-            
-            st.markdown("---")
-            st.subheader("🔬 Chi tiết các bài kiểm tra của AI")
-            
-            col_left, col_right = st.columns(2)
-            
-            with col_left:
-                st.markdown("**So sánh giá trị**")
-                st.metric("Giá bạn nhập", f"{gia_ban:.2f} tỷ")
-                st.metric("Giá AI thẩm định", f"{pred_price:.2f} tỷ", delta=f"{gia_ban - pred_price:+.2f} tỷ (Chênh lệch)")
+            with col1:
+                dien_tich = st.number_input("🏠 Diện tích (m²)", min_value=10.0, max_value=500.0, value=75.0, step=5.0)
+                gia_ban = st.number_input("💰 Giá đang rao bán (tỷ đồng)", min_value=0.5, max_value=500.0, value=7.0, step=0.5)
                 
-            with col_right:
-                st.markdown("**Kết quả 4 lớp kiểm tra**")
+            with col2:
+                loai_hinh = st.selectbox("🏢 Loại hình", ["Nhà riêng", "Căn hộ", "Đất nền"])
+                quan = st.selectbox("📍 Khu vực", ["Quận Gò Vấp", "Quận Phú Nhuận", "Quận Bình Thạnh"])
                 
-                if anomaly_zscore:
-                    st.error("❌ Lớp 1 (Mặt bằng chung): Giá chênh lệch quá lớn so với khu vực.")
+            with col3:
+                dac_diem = st.selectbox("📍 Vị trí đường/hẻm", ["Mặt tiền", "Hẻm xe hơi", "Hẻm nhỏ"])
+                so_phong_ngu = st.number_input("🛏️ Số phòng ngủ", min_value=1, max_value=10, value=3, step=1)
+            
+            # Map giá trị cho model
+            loai_hinh_map = {"Nhà riêng": 0, "Căn hộ": 1, "Đất nền": 2}
+            quan_map = {"Quận Gò Vấp": 0, "Quận Phú Nhuận": 1, "Quận Bình Thạnh": 2}
+            dac_diem_map = {"Mặt tiền": 7, "Hẻm xe hơi": 6, "Hẻm nhỏ": 2}
+            
+            # Thông số phụ
+            with st.expander("Nhấn vào đây nếu bạn muốn nhập thêm chi tiết (Không bắt buộc)"):
+                col4, col5, col6 = st.columns(3)
+                with col4:
+                    chieu_ngang = st.number_input("Chiều rộng (m)", min_value=2.0, max_value=30.0, value=5.0, step=0.5, key="anom_width")
+                    chieu_dai = st.number_input("Chiều dài (m)", min_value=3.0, max_value=50.0, value=15.0, step=0.5, key="anom_length")
+                with col5:
+                    tong_tang = st.number_input("Số tầng", min_value=1, max_value=10, value=2, key="anom_floor")
+                    so_phong_ve_sinh = st.number_input("Số phòng vệ sinh", min_value=1, max_value=6, value=2, key="anom_bath")
+                with col6:
+                    phap_ly = st.selectbox("Giấy tờ pháp lý", ["Sổ hồng", "Sổ đỏ", "Đang hoàn thiện"], key="anom_legal")
+            
+            submitted = st.form_submit_button("🔍 Phân tích rủi ro", type="primary")
+        
+        if submitted:
+            phap_ly_map = {"Sổ hồng": 5, "Sổ đỏ": 4, "Đang hoàn thiện": 2}
+            price_m2 = gia_ban / dien_tich
+            
+            # Logic tính toán
+            mean_price = 6.5
+            std_price = 9.95
+            z_score = abs(gia_ban - mean_price) / std_price
+            anomaly_zscore = z_score > 3
+            
+            anomaly_minmax = (price_m2 < 0.03) or (price_m2 > 0.5)
+            
+            p10, p90 = 0.08, 0.25
+            anomaly_percentile = (price_m2 < p10) or (price_m2 > p90)
+            
+            input_data = pd.DataFrame([{
+                "dien_tich": dien_tich,
+                "loai_hinh": loai_hinh_map[loai_hinh],
+                "giay_to_phap_ly": phap_ly_map[phap_ly],
+                "so_phong_ngu": so_phong_ngu,
+                "so_phong_ve_sinh": so_phong_ve_sinh,
+                "tong_so_tang": tong_tang,
+                "tinh_trang_noi_that": 2,
+                "dac_diem": dac_diem_map[dac_diem],
+                "chieu_ngang": chieu_ngang,
+                "chieu_dai": chieu_dai,
+                "e_Quận Gò Vấp": 1 if quan_map[quan] == 1 else 0,
+                "e_Quận Phú Nhuận": 1 if quan_map[quan] == 2 else 0
+            }])
+            
+            try:
+                pred_log = model.predict(input_data)[0]
+                pred_price = np.expm1(pred_log)
+                error = abs(gia_ban - pred_price)
+                
+                error_threshold = 0.387
+                anomaly_rf = error > error_threshold
+                
+                anomaly_score = (0.4 * anomaly_rf + 0.2 * anomaly_zscore + 0.2 * anomaly_minmax + 0.2 * anomaly_percentile)
+                
+                st.markdown("---")
+                st.subheader("📊 Kết luận từ Hệ thống")
+                
+                if anomaly_score >= 0.5:
+                    st.error("🚨 **CẢNH BÁO: MỨC GIÁ CÓ DẤU HIỆU BẤT THƯỜNG!** 🚨")
+                    st.write("Giao dịch này tiềm ẩn rủi ro. Mức giá bạn nhập vào đang chênh lệch quá lớn so với giá trị thực tế của thị trường.")
                 else:
-                    st.success("✅ Lớp 1 (Mặt bằng chung): An toàn.")
+                    st.success("✅ **AN TOÀN: MỨC GIÁ HỢP LÝ** ✅")
+                    st.write("Mức giá này phù hợp với mặt bằng chung của thị trường và các đặc điểm của căn nhà.")
                 
-                if anomaly_minmax:
-                    st.error("❌ Lớp 2 (Khung giá chuẩn): Đơn giá nằm ngoài khung giao dịch phổ biến.")
-                else:
-                    st.success("✅ Lớp 2 (Khung giá chuẩn): An toàn.")
+                st.markdown("---")
+                st.subheader("🔬 Chi tiết các bài kiểm tra của AI")
+                
+                col_left, col_right = st.columns(2)
+                
+                with col_left:
+                    st.markdown("**So sánh giá trị**")
+                    st.metric("Giá bạn nhập", f"{gia_ban:.2f} tỷ")
+                    st.metric("Giá AI thẩm định", f"{pred_price:.2f} tỷ", delta=f"{gia_ban - pred_price:+.2f} tỷ")
                     
-                if anomaly_percentile:
-                    st.error("❌ Lớp 3 (Phân khúc): Mức giá thuộc nhóm cực hiếm, cần cẩn trọng.")
-                else:
-                    st.success("✅ Lớp 3 (Phân khúc): An toàn.")
+                with col_right:
+                    st.markdown("**Kết quả 4 lớp kiểm tra**")
+                    
+                    if anomaly_zscore:
+                        st.error("❌ Lớp 1 (Mặt bằng chung): Giá chênh lệch quá lớn so với khu vực.")
+                    else:
+                        st.success("✅ Lớp 1 (Mặt bằng chung): An toàn.")
+                    
+                    if anomaly_minmax:
+                        st.error("❌ Lớp 2 (Khung giá chuẩn): Đơn giá nằm ngoài khung giao dịch phổ biến.")
+                    else:
+                        st.success("✅ Lớp 2 (Khung giá chuẩn): An toàn.")
+                        
+                    if anomaly_percentile:
+                        st.error("❌ Lớp 3 (Phân khúc): Mức giá thuộc nhóm cực hiếm, cần cẩn trọng.")
+                    else:
+                        st.success("✅ Lớp 3 (Phân khúc): An toàn.")
+                    
+                    if anomaly_rf:
+                        st.error("❌ Lớp 4 (AI Thẩm định): Giá không tương xứng với tiện ích/vị trí nhà.")
+                    else:
+                        st.success("✅ Lớp 4 (AI Thẩm định): Giá tương xứng với tiện ích nhà.")
                 
+                st.markdown("---")
+                st.subheader("💡 Lời khuyên cho bạn")
+                
+                reasons = []
+                if anomaly_zscore:
+                    reasons.append("• **Về mặt bằng chung:** Mức giá này đang chênh lệch rất bất thường so với mức giá trung bình của toàn khu vực.")
+                if anomaly_minmax:
+                    reasons.append(f"• **Về đơn giá:** Mức giá {price_m2:.2f} tỷ/m² là mức giá phi thực tế hoặc rất hiếm gặp trên thị trường hiện nay.")
+                if anomaly_percentile:
+                    reasons.append("• **Về phân khúc:** Giao dịch này có dấu hiệu bị 'thổi giá' (nếu quá cao) hoặc có vấn đề nghiêm trọng về pháp lý/quy hoạch (nếu quá thấp).")
                 if anomaly_rf:
-                    st.error("❌ Lớp 4 (AI Thẩm định): Giá không tương xứng với tiện ích/vị trí nhà.")
+                    reasons.append("• **Về giá trị thực:** Trí tuệ nhân tạo đánh giá rằng với diện tích, vị trí và tiện ích như trên, căn nhà không thể có mức giá này.")
+                
+                if reasons:
+                    for reason in reasons:
+                        st.write(reason)
+                    st.warning("⚠️ **Khuyến nghị:** Bạn nên đến xem xét trực tiếp tài sản, kiểm tra kỹ giấy tờ pháp lý, quy hoạch và tham khảo thêm ý kiến chuyên gia trước khi xuống tiền.")
                 else:
-                    st.success("✅ Lớp 4 (AI Thẩm định): Giá tương xứng với tiện ích nhà.")
-            
-            st.markdown("---")
-            st.subheader("💡 Lời khuyên cho bạn")
-            
-            reasons = []
-            if anomaly_zscore:
-                reasons.append("• **Về mặt bằng chung:** Mức giá này đang chênh lệch rất bất thường so với mức giá trung bình của toàn khu vực.")
-            if anomaly_minmax:
-                reasons.append(f"• **Về đơn giá:** Mức giá {price_m2:.2f} tỷ/m² là mức giá phi thực tế hoặc rất hiếm gặp trên thị trường hiện nay.")
-            if anomaly_percentile:
-                reasons.append("• **Về phân khúc:** Giao dịch này có dấu hiệu bị 'thổi giá' (nếu quá cao) hoặc có vấn đề nghiêm trọng về pháp lý/quy hoạch (nếu quá thấp).")
-            if anomaly_rf:
-                reasons.append("• **Về giá trị thực:** Trí tuệ nhân tạo đánh giá rằng với diện tích, vị trí và tiện ích như trên, căn nhà không thể có mức giá này.")
-            
-            if reasons:
-                for reason in reasons:
-                    st.write(reason)
-                st.warning("⚠️ **Khuyến nghị:** Bạn nên đến xem xét trực tiếp tài sản, kiểm tra kỹ giấy tờ pháp lý, quy hoạch và tham khảo thêm ý kiến chuyên gia trước khi xuống tiền.")
-            else:
-                st.write("✅ Mọi chỉ số đều nằm trong vùng an toàn. Bạn có thể tự tin tiến hành các bước tiếp theo của giao dịch.")
-            
-        except Exception as e:
-            st.error("⚠️ Vui lòng kiểm tra lại các thông tin đã nhập.")
+                    st.write("✅ Mọi chỉ số đều nằm trong vùng an toàn. Bạn có thể tự tin tiến hành các bước tiếp theo của giao dịch.")
+                
+            except Exception as e:
+                st.error(f"⚠️ Vui lòng kiểm tra lại các thông tin đã nhập: {str(e)}")
+    
+    # ==================== TAB 2: UPLOAD CSV (KIỂM TRA HÀNG LOẠT) ====================
+    with tab2:
+        st.markdown("""
+        ### 📂 Kiểm tra rủi ro hàng loạt bằng file CSV
+        
+        **Hướng dẫn:**
+        1. Tải file mẫu để tham khảo cấu trúc dữ liệu chuẩn
+        2. Hoặc upload file CSV của bạn (hệ thống sẽ tự động nhận diện)
+        3. Hệ thống sẽ kiểm tra rủi ro cho từng bất động sản và xuất kết quả
+        """)
+        
+        # Nút tải file mẫu
+        if st.button("📥 Tải file mẫu CSV", key="download_template_risk"):
+            sample_data = pd.DataFrame({
+                "chiều rộng": [5.0, 6.5, 4.2, 7.0],
+                "chiều dài": [15.0, 12.0, 10.5, 18.0],
+                "phòng ngủ": [3, 4, 2, 5],
+                "phòng vệ sinh": [2, 3, 1, 4],
+                "số tầng": [2, 3, 1, 4],
+                "loại hình": ["Nhà riêng", "Căn hộ", "Nhà riêng", "Đất nền"],
+                "pháp lý": ["Sổ hồng", "Sổ đỏ", "Sổ hồng", "Sổ đỏ"],
+                "nội thất": ["Đầy đủ", "Cơ bản", "Chưa có", "Đầy đủ"],
+                "vị trí": ["Mặt tiền", "Hẻm xe hơi", "Hẻm nhỏ", "Mặt tiền"],
+                "quận": ["Gò Vấp", "Bình Thạnh", "Phú Nhuận", "Gò Vấp"],
+                "giá_ban (tỷ)": [8.5, 12.0, 5.2, 25.0],
+                "diện tích (m²)": [75, 78, 44, 126]
+            })
+            csv = sample_data.to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="📥 Tải file mẫu (CSV)",
+                data=csv,
+                file_name="mau_kiem_tra_rui_ro.csv",
+                mime="text/csv",
+                key="download_risk_btn"
+            )
+        
+        st.divider()
+        
+        # Upload file
+        uploaded_file = st.file_uploader(
+            "📁 Chọn file CSV của bạn",
+            type=["csv"],
+            help="Hệ thống tự động nhận diện cột dữ liệu. Cần có cột 'giá_ban (tỷ)' và 'diện tích (m²)' hoặc các cột tương đương.",
+            key="csv_uploader_risk"
+        )
+        
+        if uploaded_file is not None:
+            try:
+                # Đọc file
+                df_raw = pd.read_csv(uploaded_file)
+                st.info(f"📄 File đã tải: {len(df_raw)} dòng, {len(df_raw.columns)} cột")
+                
+                with st.expander("📋 Xem trước dữ liệu gốc", expanded=False):
+                    st.dataframe(df_raw.head(10), use_container_width=True)
+                
+                # ========== TIỀN XỬ LÝ ==========
+                with st.spinner("🔄 Đang xử lý và kiểm tra rủi ro..."):
+                    # Mapping tên cột
+                    col_mapping = {
+                        "chieu_ngang": ["chieu_ngang", "chiều rộng", "chiều ngang", "ngang", "width"],
+                        "chieu_dai": ["chieu_dai", "chiều dài", "dài", "depth", "length"],
+                        "so_phong_ngu": ["so_phong_ngu", "số phòng ngủ", "phòng ngủ", "bedroom"],
+                        "so_phong_ve_sinh": ["so_phong_ve_sinh", "số phòng vệ sinh", "phòng vệ sinh", "toilet", "wc"],
+                        "tong_so_tang": ["tong_so_tang", "số tầng", "tầng", "floor"],
+                        "loai_hinh": ["loai_hinh", "loại hình", "loại nhà", "type"],
+                        "phap_ly": ["phap_ly", "pháp lý", "giấy tờ", "sổ"],
+                        "noi_that": ["noi_that", "nội thất", "furniture"],
+                        "dac_diem": ["dac_diem", "đặc điểm", "vị trí", "hẻm", "đường"],
+                        "quan": ["quan", "quận", "district", "khu vực"],
+                        "gia_ban": ["gia_ban", "giá bán", "giá", "price", "giá_ban (tỷ)"],
+                        "dien_tich": ["dien_tich", "diện tích", "area", "diện tích (m²)"]
+                    }
+                    
+                    # Tạo dataframe chuẩn
+                    df_std = pd.DataFrame()
+                    warnings = []
+                    
+                    for target, names in col_mapping.items():
+                        found = False
+                        for name in names:
+                            matching = [c for c in df_raw.columns if name.lower() in c.lower()]
+                            if matching:
+                                df_std[target] = df_raw[matching[0]]
+                                found = True
+                                break
+                        if not found and target in ["gia_ban", "dien_tich"]:
+                            warnings.append(f"❌ Thiếu cột bắt buộc: '{target}'")
+                        elif not found:
+                            default = {"chieu_ngang": 5.0, "chieu_dai": 10.0, "so_phong_ngu": 2, "so_phong_ve_sinh": 2,
+                                      "tong_so_tang": 2, "loai_hinh": "Nhà riêng", "phap_ly": "Sổ hồng",
+                                      "noi_that": "Cơ bản", "dac_diem": "Hẻm xe hơi", "quan": "Quận Gò Vấp"}
+                            df_std[target] = default.get(target, 0)
+                            warnings.append(f"⚠️ Thiếu cột '{target}' - dùng mặc định: {default.get(target, 'N/A')}")
+                    
+                    if "gia_ban" not in df_std.columns or "dien_tich" not in df_std.columns:
+                        st.error("❌ File không có cột giá bán hoặc diện tích. Vui lòng kiểm tra lại!")
+                        st.stop()
+                    
+                    # Chuẩn hóa số
+                    for col in ["chieu_ngang", "chieu_dai", "so_phong_ngu", "so_phong_ve_sinh", "tong_so_tang", "gia_ban", "dien_tich"]:
+                        if col in df_std.columns:
+                            df_std[col] = pd.to_numeric(df_std[col], errors='coerce')
+                    
+                    # Map giá trị phân loại
+                    loai_hinh_map = {"nhà riêng": "Nhà riêng", "căn hộ": "Căn hộ", "đất nền": "Đất nền"}
+                    phap_ly_map = {"sổ hồng": "Sổ hồng", "sổ đỏ": "Sổ đỏ", "đang hoàn thiện": "Đang hoàn thiện"}
+                    noi_that_map = {"đầy đủ": "Đầy đủ", "cơ bản": "Cơ bản", "chưa có": "Chưa có"}
+                    dac_diem_map = {"mặt tiền": "Mặt tiền", "hẻm xe hơi": "Hẻm xe hơi", "hẻm nhỏ": "Hẻm nhỏ"}
+                    quan_map = {"gò vấp": "Quận Gò Vấp", "phú nhuận": "Quận Phú Nhuận", "bình thạnh": "Quận Bình Thạnh"}
+                    
+                    for col, mapping in [("loai_hinh", loai_hinh_map), ("phap_ly", phap_ly_map), 
+                                         ("noi_that", noi_that_map), ("dac_diem", dac_diem_map), ("quan", quan_map)]:
+                        if col in df_std.columns:
+                            df_std[col] = df_std[col].astype(str).str.lower().map(lambda x: mapping.get(x, list(mapping.values())[0]))
+                    
+                    # Hiển thị cảnh báo
+                    if warnings:
+                        with st.expander("⚠️ Cảnh báo xử lý dữ liệu", expanded=True):
+                            for w in warnings[:8]:
+                                st.warning(w)
+                    
+                    # ========== KIỂM TRA RỦI RO ==========
+                    loai_hinh_encode = {"Nhà riêng": 0, "Căn hộ": 1, "Đất nền": 2}
+                    phap_ly_encode = {"Sổ hồng": 5, "Sổ đỏ": 4, "Đang hoàn thiện": 2}
+                    noi_that_encode = {"Đầy đủ": 1, "Cơ bản": 2, "Chưa có": 3}
+                    dac_diem_encode = {"Mặt tiền": 7, "Hẻm xe hơi": 6, "Hẻm nhỏ": 2}
+                    quan_encode = {"Quận Gò Vấp": 0, "Quận Phú Nhuận": 1, "Quận Bình Thạnh": 2}
+                    
+                    results = []
+                    mean_price = 6.5
+                    std_price = 9.95
+                    p10, p90 = 0.08, 0.25
+                    error_threshold = 0.387
+                    
+                    for idx, row in df_std.iterrows():
+                        try:
+                            gia_ban = row["gia_ban"]
+                            dien_tich = row["dien_tich"]
+                            price_m2 = gia_ban / dien_tich if dien_tich > 0 else 0
+                            
+                            # Lớp 1: Z-score
+                            z_score = abs(gia_ban - mean_price) / std_price
+                            anomaly_zscore = z_score > 3
+                            
+                            # Lớp 2: MinMax
+                            anomaly_minmax = (price_m2 < 0.03) or (price_m2 > 0.5)
+                            
+                            # Lớp 3: Percentile
+                            anomaly_percentile = (price_m2 < p10) or (price_m2 > p90)
+                            
+                            # Lớp 4: RF Model
+                            input_data = pd.DataFrame([{
+                                "dien_tich": dien_tich,
+                                "loai_hinh": loai_hinh_encode.get(row.get("loai_hinh", "Nhà riêng"), 0),
+                                "giay_to_phap_ly": phap_ly_encode.get(row.get("phap_ly", "Sổ hồng"), 2),
+                                "so_phong_ngu": int(row.get("so_phong_ngu", 2)),
+                                "so_phong_ve_sinh": int(row.get("so_phong_ve_sinh", 2)),
+                                "tong_so_tang": int(row.get("tong_so_tang", 2)),
+                                "tinh_trang_noi_that": noi_that_encode.get(row.get("noi_that", "Cơ bản"), 2),
+                                "dac_diem": dac_diem_encode.get(row.get("dac_diem", "Hẻm xe hơi"), 2),
+                                "chieu_ngang": row.get("chieu_ngang", 5.0),
+                                "chieu_dai": row.get("chieu_dai", 10.0),
+                                "e_Quận Gò Vấp": 1 if quan_encode.get(row.get("quan", "Quận Gò Vấp"), 0) == 1 else 0,
+                                "e_Quận Phú Nhuận": 1 if quan_encode.get(row.get("quan", "Quận Gò Vấp"), 0) == 2 else 0
+                            }])
+                            
+                            pred_log = model.predict(input_data)[0]
+                            pred_price = np.expm1(pred_log)
+                            error = abs(gia_ban - pred_price)
+                            anomaly_rf = error > error_threshold
+                            
+                            # Điểm rủi ro tổng hợp
+                            risk_score = (0.4 * anomaly_rf + 0.2 * anomaly_zscore + 0.2 * anomaly_minmax + 0.2 * anomaly_percentile)
+                            
+                            # Kết luận
+                            if risk_score >= 0.5:
+                                risk_level = "🚨 CAO"
+                                risk_color = "red"
+                            elif risk_score >= 0.3:
+                                risk_level = "⚠️ TRUNG BÌNH"
+                                risk_color = "orange"
+                            else:
+                                risk_level = "✅ THẤP"
+                                risk_color = "green"
+                            
+                            results.append({
+                                "STT": idx + 1,
+                                "Giá (tỷ)": round(gia_ban, 2),
+                                "Diện tích (m²)": round(dien_tich, 2),
+                                "Đơn giá (tỷ/m²)": round(price_m2, 3),
+                                "Giá AI (tỷ)": round(pred_price, 2),
+                                "Chênh lệch": round(gia_ban - pred_price, 2),
+                                "Lớp 1 (MB)": "⚠️" if anomaly_zscore else "✅",
+                                "Lớp 2 (KG)": "⚠️" if anomaly_minmax else "✅",
+                                "Lớp 3 (PK)": "⚠️" if anomaly_percentile else "✅",
+                                "Lớp 4 (AI)": "⚠️" if anomaly_rf else "✅",
+                                "Điểm rủi ro": f"{risk_score:.2f}",
+                                "Kết luận": risk_level
+                            })
+                        except Exception as e:
+                            results.append({
+                                "STT": idx + 1,
+                                "Kết luận": f"Lỗi: {str(e)[:50]}"
+                            })
+                    
+                    df_results = pd.DataFrame(results)
+                    
+                    # Thống kê
+                    risk_summary = df_results[df_results["Kết luận"].str.contains("CAO|TRUNG BÌNH|THẤP", na=False)]
+                    if len(risk_summary) > 0:
+                        st.subheader("📊 Tổng quan rủi ro")
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            high_risk = len(risk_summary[risk_summary["Kết luận"] == "🚨 CAO"])
+                            st.metric("🚨 Rủi ro CAO", f"{high_risk} BĐS", delta=f"{high_risk/len(risk_summary)*100:.0f}%" if len(risk_summary) > 0 else "0%")
+                        with col2:
+                            med_risk = len(risk_summary[risk_summary["Kết luận"] == "⚠️ TRUNG BÌNH"])
+                            st.metric("⚠️ Rủi ro TRUNG BÌNH", f"{med_risk} BĐS")
+                        with col3:
+                            low_risk = len(risk_summary[risk_summary["Kết luận"] == "✅ THẤP"])
+                            st.metric("✅ Rủi ro THẤP", f"{low_risk} BĐS")
+                        
+                        # Biểu đồ
+                        risk_counts = risk_summary["Kết luận"].value_counts()
+                        st.subheader("📊 Phân bố mức độ rủi ro")
+                        st.bar_chart(risk_counts)
+                    
+                    # Hiển thị kết quả
+                    st.subheader("📋 Kết quả kiểm tra rủi ro")
+                    st.dataframe(df_results, use_container_width=True, height=500)
+                    
+                    # Nút tải kết quả
+                    csv_results = df_results.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button(
+                        label="📥 Tải kết quả kiểm tra (CSV)",
+                        data=csv_results,
+                        file_name="ket_qua_kiem_tra_rui_ro.csv",
+                        mime="text/csv",
+                        key="download_risk_results"
+                    )
+                    
+                    st.success(f"✅ Đã kiểm tra xong {len(df_results)} bất động sản!")
+                    
+            except Exception as e:
+                st.error(f"❌ Lỗi khi xử lý file: {str(e)}")
+                st.info("Vui lòng kiểm tra lại định dạng file CSV hoặc tải file mẫu để tham khảo.")
