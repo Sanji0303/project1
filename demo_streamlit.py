@@ -395,7 +395,7 @@ elif menu == "⚠️ Kiểm tra rủi ro giá":
     # Tạo 2 tab: Nhập thủ công và Upload file
     tab1, tab2 = st.tabs(["📝 Nhập thủ công", "📂 Upload file CSV (Kiểm tra hàng loạt)"])
     
-    # ==================== TAB 1: NHẬP THỦ CÔNG (GIỮ NGUYÊN CODE CŨ) ====================
+    # ==================== TAB 1: NHẬP THỦ CÔNG ====================
     with tab1:
         st.markdown("""
         ### Đánh giá mức độ an toàn của giá bán
@@ -593,201 +593,220 @@ elif menu == "⚠️ Kiểm tra rủi ro giá":
         
         if uploaded_file is not None:
             try:
-                # Đọc file
+                # ========== ĐỌC FILE ==========
                 df_raw = pd.read_csv(uploaded_file)
                 st.info(f"📄 File đã tải: {len(df_raw)} dòng, {len(df_raw.columns)} cột")
                 
                 with st.expander("📋 Xem trước dữ liệu gốc", expanded=False):
                     st.dataframe(df_raw.head(10), use_container_width=True)
                 
-                # ========== TIỀN XỬ LÝ ==========
-                with st.spinner("🔄 Đang xử lý và kiểm tra rủi ro..."):
-                    # Mapping tên cột
-                    col_mapping = {
-                        "chieu_ngang": ["chieu_ngang", "chiều rộng", "chiều ngang", "ngang", "width"],
-                        "chieu_dai": ["chieu_dai", "chiều dài", "dài", "depth", "length"],
-                        "so_phong_ngu": ["so_phong_ngu", "số phòng ngủ", "phòng ngủ", "bedroom"],
-                        "so_phong_ve_sinh": ["so_phong_ve_sinh", "số phòng vệ sinh", "phòng vệ sinh", "toilet", "wc"],
-                        "tong_so_tang": ["tong_so_tang", "số tầng", "tầng", "floor"],
-                        "loai_hinh": ["loai_hinh", "loại hình", "loại nhà", "type"],
-                        "phap_ly": ["phap_ly", "pháp lý", "giấy tờ", "sổ"],
-                        "noi_that": ["noi_that", "nội thất", "furniture"],
-                        "dac_diem": ["dac_diem", "đặc điểm", "vị trí", "hẻm", "đường"],
-                        "quan": ["quan", "quận", "district", "khu vực"],
-                        "gia_ban": ["gia_ban", "giá bán", "giá", "price", "giá_ban (tỷ)"],
-                        "dien_tich": ["dien_tich", "diện tích", "area", "diện tích (m²)"]
+                # ========== HÀM TIỀN XỬ LÝ ==========
+                def clean_batch_data(df):
+                    """Làm sạch dữ liệu batch, xử lý NaN và chuẩn hóa tên cột"""
+                    
+                    # 1. Chuẩn hóa tên cột (gộp các tên tương đồng)
+                    rename_map = {
+                        'chiều rộng': 'chieu_ngang', 'chiều ngang': 'chieu_ngang', 'ngang': 'chieu_ngang',
+                        'chiều dài': 'chieu_dai', 'dài': 'chieu_dai',
+                        'số phòng ngủ': 'so_phong_ngu', 'phòng ngủ': 'so_phong_ngu', 'bedroom': 'so_phong_ngu',
+                        'số phòng vệ sinh': 'so_phong_ve_sinh', 'phòng vệ sinh': 'so_phong_ve_sinh', 'toilet': 'so_phong_ve_sinh', 'wc': 'so_phong_ve_sinh',
+                        'số tầng': 'tong_so_tang', 'tầng': 'tong_so_tang', 'floor': 'tong_so_tang',
+                        'loại hình': 'loai_hinh', 'loại nhà': 'loai_hinh', 'type': 'loai_hinh',
+                        'pháp lý': 'phap_ly', 'giấy tờ': 'phap_ly', 'sổ': 'phap_ly',
+                        'nội thất': 'noi_that', 'furniture': 'noi_that',
+                        'vị trí': 'dac_diem', 'đặc điểm': 'dac_diem', 'hẻm': 'dac_diem', 'đường': 'dac_diem',
+                        'quận': 'quan', 'district': 'quan', 'khu vực': 'quan',
+                        'giá bán': 'gia_ban', 'giá': 'gia_ban', 'price': 'gia_ban',
+                        'diện tích': 'dien_tich', 'area': 'dien_tich'
+                    }
+                    df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
+                    
+                    # 2. Xử lý NaN cho các cột số
+                    numeric_defaults = {
+                        'chieu_ngang': 5.0, 'chieu_dai': 10.0,
+                        'so_phong_ngu': 2, 'so_phong_ve_sinh': 2, 'tong_so_tang': 2,
+                        'gia_ban': 0, 'dien_tich': 0
                     }
                     
-                    # Tạo dataframe chuẩn
-                    df_std = pd.DataFrame()
-                    warnings = []
+                    for col, default in numeric_defaults.items():
+                        if col in df.columns:
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                            df[col] = df[col].fillna(default)
                     
-                    for target, names in col_mapping.items():
-                        found = False
-                        for name in names:
-                            matching = [c for c in df_raw.columns if name.lower() in c.lower()]
-                            if matching:
-                                df_std[target] = df_raw[matching[0]]
-                                found = True
-                                break
-                        if not found and target in ["gia_ban", "dien_tich"]:
-                            warnings.append(f"❌ Thiếu cột bắt buộc: '{target}'")
-                        elif not found:
-                            default = {"chieu_ngang": 5.0, "chieu_dai": 10.0, "so_phong_ngu": 2, "so_phong_ve_sinh": 2,
-                                      "tong_so_tang": 2, "loai_hinh": "Nhà riêng", "phap_ly": "Sổ hồng",
-                                      "noi_that": "Cơ bản", "dac_diem": "Hẻm xe hơi", "quan": "Quận Gò Vấp"}
-                            df_std[target] = default.get(target, 0)
-                            warnings.append(f"⚠️ Thiếu cột '{target}' - dùng mặc định: {default.get(target, 'N/A')}")
+                    # 3. Xử lý NaN cho các cột phân loại (gán giá trị mặc định)
+                    categorical_defaults = {
+                        'loai_hinh': 'Nhà riêng',
+                        'phap_ly': 'Sổ hồng',
+                        'noi_that': 'Cơ bản',
+                        'dac_diem': 'Hẻm xe hơi',
+                        'quan': 'Quận Gò Vấp'
+                    }
                     
-                    if "gia_ban" not in df_std.columns or "dien_tich" not in df_std.columns:
-                        st.error("❌ File không có cột giá bán hoặc diện tích. Vui lòng kiểm tra lại!")
+                    for col, default in categorical_defaults.items():
+                        if col in df.columns:
+                            df[col] = df[col].fillna(default)
+                            # Chuẩn hóa chữ thường
+                            df[col] = df[col].astype(str).str.lower()
+                    
+                    return df
+                
+                # ========== TIỀN XỬ LÝ ==========
+                with st.spinner("🔄 Đang xử lý và chuẩn hóa dữ liệu..."):
+                    df_cleaned = clean_batch_data(df_raw)
+                    
+                    # Hiển thị dữ liệu sau xử lý
+                    with st.expander("📊 Xem trước dữ liệu sau chuẩn hóa", expanded=False):
+                        st.dataframe(df_cleaned.head(10), use_container_width=True)
+                    
+                    # Kiểm tra cột bắt buộc
+                    if 'gia_ban' not in df_cleaned.columns:
+                        st.error("❌ Không tìm thấy cột giá bán (có thể tên là: giá, giá bán, price)")
                         st.stop()
                     
-                    # Chuẩn hóa số
-                    for col in ["chieu_ngang", "chieu_dai", "so_phong_ngu", "so_phong_ve_sinh", "tong_so_tang", "gia_ban", "dien_tich"]:
-                        if col in df_std.columns:
-                            df_std[col] = pd.to_numeric(df_std[col], errors='coerce')
-                    
-                    # Map giá trị phân loại
-                    loai_hinh_map = {"nhà riêng": "Nhà riêng", "căn hộ": "Căn hộ", "đất nền": "Đất nền"}
-                    phap_ly_map = {"sổ hồng": "Sổ hồng", "sổ đỏ": "Sổ đỏ", "đang hoàn thiện": "Đang hoàn thiện"}
-                    noi_that_map = {"đầy đủ": "Đầy đủ", "cơ bản": "Cơ bản", "chưa có": "Chưa có"}
-                    dac_diem_map = {"mặt tiền": "Mặt tiền", "hẻm xe hơi": "Hẻm xe hơi", "hẻm nhỏ": "Hẻm nhỏ"}
-                    quan_map = {"gò vấp": "Quận Gò Vấp", "phú nhuận": "Quận Phú Nhuận", "bình thạnh": "Quận Bình Thạnh"}
-                    
-                    for col, mapping in [("loai_hinh", loai_hinh_map), ("phap_ly", phap_ly_map), 
-                                         ("noi_that", noi_that_map), ("dac_diem", dac_diem_map), ("quan", quan_map)]:
-                        if col in df_std.columns:
-                            df_std[col] = df_std[col].astype(str).str.lower().map(lambda x: mapping.get(x, list(mapping.values())[0]))
-                    
-                    # Hiển thị cảnh báo
-                    if warnings:
-                        with st.expander("⚠️ Cảnh báo xử lý dữ liệu", expanded=True):
-                            for w in warnings[:8]:
-                                st.warning(w)
-                    
-                    # ========== KIỂM TRA RỦI RO ==========
-                    loai_hinh_encode = {"Nhà riêng": 0, "Căn hộ": 1, "Đất nền": 2}
-                    phap_ly_encode = {"Sổ hồng": 5, "Sổ đỏ": 4, "Đang hoàn thiện": 2}
-                    noi_that_encode = {"Đầy đủ": 1, "Cơ bản": 2, "Chưa có": 3}
-                    dac_diem_encode = {"Mặt tiền": 7, "Hẻm xe hơi": 6, "Hẻm nhỏ": 2}
-                    quan_encode = {"Quận Gò Vấp": 0, "Quận Phú Nhuận": 1, "Quận Bình Thạnh": 2}
-                    
-                    results = []
-                    mean_price = 6.5
-                    std_price = 9.95
-                    p10, p90 = 0.08, 0.25
-                    error_threshold = 0.387
-                    
-                    for idx, row in df_std.iterrows():
-                        try:
-                            gia_ban = row["gia_ban"]
-                            dien_tich = row["dien_tich"]
-                            price_m2 = gia_ban / dien_tich if dien_tich > 0 else 0
-                            
-                            # Lớp 1: Z-score
-                            z_score = abs(gia_ban - mean_price) / std_price
-                            anomaly_zscore = z_score > 3
-                            
-                            # Lớp 2: MinMax
-                            anomaly_minmax = (price_m2 < 0.03) or (price_m2 > 0.5)
-                            
-                            # Lớp 3: Percentile
-                            anomaly_percentile = (price_m2 < p10) or (price_m2 > p90)
-                            
-                            # Lớp 4: RF Model
-                            input_data = pd.DataFrame([{
-                                "dien_tich": dien_tich,
-                                "loai_hinh": loai_hinh_encode.get(row.get("loai_hinh", "Nhà riêng"), 0),
-                                "giay_to_phap_ly": phap_ly_encode.get(row.get("phap_ly", "Sổ hồng"), 2),
-                                "so_phong_ngu": int(row.get("so_phong_ngu", 2)),
-                                "so_phong_ve_sinh": int(row.get("so_phong_ve_sinh", 2)),
-                                "tong_so_tang": int(row.get("tong_so_tang", 2)),
-                                "tinh_trang_noi_that": noi_that_encode.get(row.get("noi_that", "Cơ bản"), 2),
-                                "dac_diem": dac_diem_encode.get(row.get("dac_diem", "Hẻm xe hơi"), 2),
-                                "chieu_ngang": row.get("chieu_ngang", 5.0),
-                                "chieu_dai": row.get("chieu_dai", 10.0),
-                                "e_Quận Gò Vấp": 1 if quan_encode.get(row.get("quan", "Quận Gò Vấp"), 0) == 1 else 0,
-                                "e_Quận Phú Nhuận": 1 if quan_encode.get(row.get("quan", "Quận Gò Vấp"), 0) == 2 else 0
-                            }])
-                            
-                            pred_log = model.predict(input_data)[0]
-                            pred_price = np.expm1(pred_log)
-                            error = abs(gia_ban - pred_price)
-                            anomaly_rf = error > error_threshold
-                            
-                            # Điểm rủi ro tổng hợp
-                            risk_score = (0.4 * anomaly_rf + 0.2 * anomaly_zscore + 0.2 * anomaly_minmax + 0.2 * anomaly_percentile)
-                            
-                            # Kết luận
-                            if risk_score >= 0.5:
-                                risk_level = "🚨 CAO"
-                                risk_color = "red"
-                            elif risk_score >= 0.3:
-                                risk_level = "⚠️ TRUNG BÌNH"
-                                risk_color = "orange"
-                            else:
-                                risk_level = "✅ THẤP"
-                                risk_color = "green"
-                            
-                            results.append({
-                                "STT": idx + 1,
-                                "Giá (tỷ)": round(gia_ban, 2),
-                                "Diện tích (m²)": round(dien_tich, 2),
-                                "Đơn giá (tỷ/m²)": round(price_m2, 3),
-                                "Giá AI (tỷ)": round(pred_price, 2),
-                                "Chênh lệch": round(gia_ban - pred_price, 2),
-                                "Lớp 1 (MB)": "⚠️" if anomaly_zscore else "✅",
-                                "Lớp 2 (KG)": "⚠️" if anomaly_minmax else "✅",
-                                "Lớp 3 (PK)": "⚠️" if anomaly_percentile else "✅",
-                                "Lớp 4 (AI)": "⚠️" if anomaly_rf else "✅",
-                                "Điểm rủi ro": f"{risk_score:.2f}",
-                                "Kết luận": risk_level
-                            })
-                        except Exception as e:
-                            results.append({
-                                "STT": idx + 1,
-                                "Kết luận": f"Lỗi: {str(e)[:50]}"
-                            })
-                    
-                    df_results = pd.DataFrame(results)
-                    
-                    # Thống kê
-                    risk_summary = df_results[df_results["Kết luận"].str.contains("CAO|TRUNG BÌNH|THẤP", na=False)]
-                    if len(risk_summary) > 0:
-                        st.subheader("📊 Tổng quan rủi ro")
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            high_risk = len(risk_summary[risk_summary["Kết luận"] == "🚨 CAO"])
-                            st.metric("🚨 Rủi ro CAO", f"{high_risk} BĐS", delta=f"{high_risk/len(risk_summary)*100:.0f}%" if len(risk_summary) > 0 else "0%")
-                        with col2:
-                            med_risk = len(risk_summary[risk_summary["Kết luận"] == "⚠️ TRUNG BÌNH"])
-                            st.metric("⚠️ Rủi ro TRUNG BÌNH", f"{med_risk} BĐS")
-                        with col3:
-                            low_risk = len(risk_summary[risk_summary["Kết luận"] == "✅ THẤP"])
-                            st.metric("✅ Rủi ro THẤP", f"{low_risk} BĐS")
+                    if 'dien_tich' not in df_cleaned.columns:
+                        st.error("❌ Không tìm thấy cột diện tích (có thể tên là: diện tích, area)")
+                        st.stop()
+                
+                # ========== MAP GIÁ TRỊ ==========
+                loai_hinh_encode = {"nhà riêng": 0, "căn hộ": 1, "đất nền": 2}
+                phap_ly_encode = {"sổ hồng": 5, "sổ đỏ": 4, "đang hoàn thiện": 2}
+                noi_that_encode = {"đầy đủ": 1, "cơ bản": 2, "chưa có": 3}
+                dac_diem_encode = {"mặt tiền": 7, "hẻm xe hơi": 6, "hẻm nhỏ": 2}
+                quan_encode = {"quận gò vấp": 0, "quận phú nhuận": 1, "quận bình thạnh": 2}
+                
+                # ========== KIỂM TRA RỦI RO TỪNG DÒNG ==========
+                mean_price = 6.5
+                std_price = 9.95
+                p10, p90 = 0.08, 0.25
+                error_threshold = 0.387
+                
+                results = []
+                
+                for idx, row in df_cleaned.iterrows():
+                    try:
+                        # Lấy giá trị (đã được xử lý NaN)
+                        gia_ban = row["gia_ban"]
+                        dien_tich = row["dien_tich"]
                         
-                        # Biểu đồ
-                        risk_counts = risk_summary["Kết luận"].value_counts()
-                        st.subheader("📊 Phân bố mức độ rủi ro")
-                        st.bar_chart(risk_counts)
-                    
-                    # Hiển thị kết quả
-                    st.subheader("📋 Kết quả kiểm tra rủi ro")
-                    st.dataframe(df_results, use_container_width=True, height=500)
-                    
-                    # Nút tải kết quả
-                    csv_results = df_results.to_csv(index=False).encode('utf-8-sig')
-                    st.download_button(
-                        label="📥 Tải kết quả kiểm tra (CSV)",
-                        data=csv_results,
-                        file_name="ket_qua_kiem_tra_rui_ro.csv",
-                        mime="text/csv",
-                        key="download_risk_results"
-                    )
-                    
-                    st.success(f"✅ Đã kiểm tra xong {len(df_results)} bất động sản!")
-                    
+                        # Tránh chia cho 0
+                        if dien_tich <= 0:
+                            dien_tich = 1
+                        
+                        price_m2 = gia_ban / dien_tich
+                        
+                        # Lớp 1: Z-score
+                        z_score = abs(gia_ban - mean_price) / std_price
+                        anomaly_zscore = z_score > 3
+                        
+                        # Lớp 2: MinMax
+                        anomaly_minmax = (price_m2 < 0.03) or (price_m2 > 0.5)
+                        
+                        # Lớp 3: Percentile
+                        anomaly_percentile = (price_m2 < p10) or (price_m2 > p90)
+                        
+                        # Lớp 4: RF Model
+                        loai_hinh = loai_hinh_encode.get(row.get("loai_hinh", "nhà riêng"), 0)
+                        phap_ly = phap_ly_encode.get(row.get("phap_ly", "sổ hồng"), 2)
+                        noi_that = noi_that_encode.get(row.get("noi_that", "cơ bản"), 2)
+                        dac_diem = dac_diem_encode.get(row.get("dac_diem", "hẻm xe hơi"), 2)
+                        quan_val = quan_encode.get(row.get("quan", "quận gò vấp"), 0)
+                        
+                        # Lấy các giá trị số (đã xử lý NaN)
+                        chieu_ngang = float(row.get("chieu_ngang", 5.0))
+                        chieu_dai = float(row.get("chieu_dai", 10.0))
+                        so_phong_ngu = int(row.get("so_phong_ngu", 2))
+                        so_phong_ve_sinh = int(row.get("so_phong_ve_sinh", 2))
+                        tong_so_tang = int(row.get("tong_so_tang", 2))
+                        
+                        input_data = pd.DataFrame([{
+                            "dien_tich": dien_tich,
+                            "loai_hinh": loai_hinh,
+                            "giay_to_phap_ly": phap_ly,
+                            "so_phong_ngu": so_phong_ngu,
+                            "so_phong_ve_sinh": so_phong_ve_sinh,
+                            "tong_so_tang": tong_so_tang,
+                            "tinh_trang_noi_that": noi_that,
+                            "dac_diem": dac_diem,
+                            "chieu_ngang": chieu_ngang,
+                            "chieu_dai": chieu_dai,
+                            "e_Quận Gò Vấp": 1 if quan_val == 1 else 0,
+                            "e_Quận Phú Nhuận": 1 if quan_val == 2 else 0
+                        }])
+                        
+                        pred_log = model.predict(input_data)[0]
+                        pred_price = np.expm1(pred_log)
+                        error = abs(gia_ban - pred_price)
+                        anomaly_rf = error > error_threshold
+                        
+                        # Điểm rủi ro tổng hợp
+                        risk_score = (0.4 * anomaly_rf + 0.2 * anomaly_zscore + 0.2 * anomaly_minmax + 0.2 * anomaly_percentile)
+                        
+                        # Kết luận
+                        if risk_score >= 0.5:
+                            risk_level = "🚨 CAO"
+                        elif risk_score >= 0.3:
+                            risk_level = "⚠️ TRUNG BÌNH"
+                        else:
+                            risk_level = "✅ THẤP"
+                        
+                        results.append({
+                            "STT": idx + 1,
+                            "Giá (tỷ)": round(gia_ban, 2),
+                            "Diện tích (m²)": round(dien_tich, 2),
+                            "Đơn giá (tỷ/m²)": round(price_m2, 3),
+                            "Giá AI (tỷ)": round(pred_price, 2),
+                            "Chênh lệch": round(gia_ban - pred_price, 2),
+                            "Lớp 1 (MB)": "⚠️" if anomaly_zscore else "✅",
+                            "Lớp 2 (KG)": "⚠️" if anomaly_minmax else "✅",
+                            "Lớp 3 (PK)": "⚠️" if anomaly_percentile else "✅",
+                            "Lớp 4 (AI)": "⚠️" if anomaly_rf else "✅",
+                            "Điểm rủi ro": f"{risk_score:.2f}",
+                            "Kết luận": risk_level
+                        })
+                    except Exception as e:
+                        results.append({
+                            "STT": idx + 1,
+                            "Kết luận": f"Lỗi: {str(e)[:50]}"
+                        })
+                
+                df_results = pd.DataFrame(results)
+                
+                # ========== THỐNG KÊ TỔNG QUAN ==========
+                st.subheader("📊 Tổng quan rủi ro")
+                
+                risk_counts = df_results[df_results["Kết luận"].str.contains("CAO|TRUNG BÌNH|THẤP", na=False)]["Kết luận"].value_counts()
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    high_risk = risk_counts.get("🚨 CAO", 0)
+                    st.metric("🚨 Rủi ro CAO", f"{high_risk} BĐS")
+                with col2:
+                    med_risk = risk_counts.get("⚠️ TRUNG BÌNH", 0)
+                    st.metric("⚠️ Rủi ro TRUNG BÌNH", f"{med_risk} BĐS")
+                with col3:
+                    low_risk = risk_counts.get("✅ THẤP", 0)
+                    st.metric("✅ Rủi ro THẤP", f"{low_risk} BĐS")
+                
+                if len(risk_counts) > 0:
+                    st.subheader("📊 Phân bố mức độ rủi ro")
+                    st.bar_chart(risk_counts)
+                
+                # ========== HIỂN THỊ KẾT QUẢ ==========
+                st.subheader("📋 Kết quả kiểm tra rủi ro")
+                st.dataframe(df_results, use_container_width=True, height=500)
+                
+                # ========== TẢI KẾT QUẢ ==========
+                csv_results = df_results.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(
+                    label="📥 Tải kết quả kiểm tra (CSV)",
+                    data=csv_results,
+                    file_name="ket_qua_kiem_tra_rui_ro.csv",
+                    mime="text/csv",
+                    key="download_risk_results"
+                )
+                
+                st.success(f"✅ Đã kiểm tra xong {len(df_results)} bất động sản!")
+                
             except Exception as e:
                 st.error(f"❌ Lỗi khi xử lý file: {str(e)}")
                 st.info("Vui lòng kiểm tra lại định dạng file CSV hoặc tải file mẫu để tham khảo.")
