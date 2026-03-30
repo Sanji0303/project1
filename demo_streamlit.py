@@ -370,3 +370,174 @@ elif menu == "🔮 Định giá Bất động sản":
             except Exception as e:
                 st.error(f"❌ Lỗi khi xử lý file: {str(e)}")
                 st.info("Vui lòng kiểm tra lại định dạng file CSV hoặc tải file mẫu để tham khảo.")
+# Kiểm tra rủi ro (Thay cho Phát hiện bất thường)
+elif menu == "⚠️ Kiểm tra rủi ro giá":
+    st.title("⚠️ Kiểm tra rủi ro giao dịch")
+    st.markdown("""
+    ### Đánh giá mức độ an toàn của giá bán
+    Bạn đang định mua hoặc bán một căn nhà? Hãy nhập mức giá đó vào đây. 
+    Hệ thống AI sẽ đối chiếu với hàng ngàn giao dịch khác để cảnh báo nếu mức giá này có dấu hiệu "bất thường" (thổi giá hoặc quá rẻ do vướng pháp lý).
+    """)
+    
+    with st.form("anomaly_form"):
+        st.subheader("📋 Thông tin giao dịch cần kiểm tra")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            dien_tich = st.number_input("🏠 Diện tích (m²)", min_value=10.0, max_value=500.0, value=75.0, step=5.0)
+            gia_ban = st.number_input("💰 Giá đang rao bán (tỷ đồng)", min_value=0.5, max_value=500.0, value=7.0, step=0.5)
+            
+        with col2:
+            loai_hinh = st.selectbox("🏢 Loại hình", ["Nhà riêng", "Căn hộ", "Đất nền"])
+            quan = st.selectbox("📍 Khu vực", ["Quận Gò Vấp", "Quận Phú Nhuận", "Quận Bình Thạnh"])
+            
+        with col3:
+            dac_diem = st.selectbox("📍 Vị trí đường/hẻm", ["Mặt tiền", "Hẻm xe hơi", "Hẻm nhỏ"])
+            so_phong_ngu = st.number_input("🛏️ Số phòng ngủ", min_value=1, max_value=10, value=3, step=1)
+        
+        # Map giá trị cho model
+        loai_hinh_map = {"Nhà riêng": 0, "Căn hộ": 1, "Đất nền": 2}
+        quan_map = {"Quận Gò Vấp": 0, "Quận Phú Nhuận": 1, "Quận Bình Thạnh": 2}
+        dac_diem_map = {"Mặt tiền": 7, "Hẻm xe hơi": 6, "Hẻm nhỏ": 2}
+        
+        # Thông số phụ (ẩn bớt sự phức tạp)
+        with st.expander("Nhấn vào đây nếu bạn muốn nhập thêm chi tiết (Không bắt buộc)"):
+            col4, col5, col6 = st.columns(3)
+            with col4:
+                chieu_ngang = st.number_input("Chiều rộng (m)", min_value=2.0, max_value=30.0, value=5.0, step=0.5, key="anom_width")
+                chieu_dai = st.number_input("Chiều dài (m)", min_value=3.0, max_value=50.0, value=15.0, step=0.5, key="anom_length")
+            with col5:
+                tong_tang = st.number_input("Số tầng", min_value=1, max_value=10, value=2, key="anom_floor")
+                so_phong_ve_sinh = st.number_input("Số phòng vệ sinh", min_value=1, max_value=6, value=2, key="anom_bath")
+            with col6:
+                phap_ly = st.selectbox("Giấy tờ pháp lý", ["Sổ hồng", "Sổ đỏ", "Đang hoàn thiện"], key="anom_legal")
+        
+        submitted = st.form_submit_button("🔍 Phân tích rủi ro", type="primary")
+    
+    if submitted:
+        phap_ly_map = {"Sổ hồng": 5, "Sổ đỏ": 4, "Đang hoàn thiện": 2}
+        price_m2 = gia_ban / dien_tich
+        
+        # Logic tính toán (Giữ nguyên)
+        mean_price = 6.5
+        std_price = 9.95
+        z_score = abs(gia_ban - mean_price) / std_price
+        anomaly_zscore = z_score > 3
+        
+        anomaly_minmax = (price_m2 < 0.03) or (price_m2 > 0.5)
+        
+        p10, p90 = 0.08, 0.25
+        anomaly_percentile = (price_m2 < p10) or (price_m2 > p90)
+        
+        input_data = pd.DataFrame([{
+            "dien_tich": dien_tich,
+            "loai_hinh": loai_hinh_map[loai_hinh],
+            "giay_to_phap_ly": phap_ly_map[phap_ly],
+            "so_phong_ngu": so_phong_ngu,
+            "so_phong_ve_sinh": so_phong_ve_sinh,
+            "tong_so_tang": tong_tang,
+            "tinh_trang_noi_that": 2,
+            "dac_diem": dac_diem_map[dac_diem],
+            "chieu_ngang": chieu_ngang,
+            "chieu_dai": chieu_dai,
+            "e_Quận Gò Vấp": 1 if quan_map[quan] == 1 else 0,
+            "e_Quận Phú Nhuận": 1 if quan_map[quan] == 2 else 0
+        }])
+        
+        try:
+            pred_log = model.predict(input_data)[0]
+            pred_price = np.expm1(pred_log)
+            error = abs(gia_ban - pred_price)
+            
+            error_threshold = 0.387
+            anomaly_rf = error > error_threshold
+            
+            anomaly_score = (0.4 * anomaly_rf + 0.2 * anomaly_zscore + 0.2 * anomaly_minmax + 0.2 * anomaly_percentile)
+            
+            st.markdown("---")
+            st.subheader("📊 Kết luận từ Hệ thống")
+            
+            if anomaly_score >= 0.5:
+                st.error("🚨 **CẢNH BÁO: MỨC GIÁ CÓ DẤU HIỆU BẤT THƯỜNG!** 🚨")
+                st.write("Giao dịch này tiềm ẩn rủi ro. Mức giá bạn nhập vào đang chênh lệch quá lớn so với giá trị thực tế của thị trường.")
+            else:
+                st.success("✅ **AN TOÀN: MỨC GIÁ HỢP LÝ** ✅")
+                st.write("Mức giá này phù hợp với mặt bằng chung của thị trường và các đặc điểm của căn nhà.")
+            
+            st.markdown("---")
+            st.subheader("🔬 Chi tiết các bài kiểm tra của AI")
+            
+            col_left, col_right = st.columns(2)
+            
+            with col_left:
+                st.markdown("**So sánh giá trị**")
+                st.metric("Giá bạn nhập", f"{gia_ban:.2f} tỷ")
+                st.metric("Giá AI thẩm định", f"{pred_price:.2f} tỷ", delta=f"{gia_ban - pred_price:+.2f} tỷ (Chênh lệch)")
+                
+            with col_right:
+                st.markdown("**Kết quả 4 lớp kiểm tra**")
+                
+                if anomaly_zscore:
+                    st.error("❌ Lớp 1 (Mặt bằng chung): Giá chênh lệch quá lớn so với khu vực.")
+                else:
+                    st.success("✅ Lớp 1 (Mặt bằng chung): An toàn.")
+                
+                if anomaly_minmax:
+                    st.error("❌ Lớp 2 (Khung giá chuẩn): Đơn giá nằm ngoài khung giao dịch phổ biến.")
+                else:
+                    st.success("✅ Lớp 2 (Khung giá chuẩn): An toàn.")
+                    
+                if anomaly_percentile:
+                    st.error("❌ Lớp 3 (Phân khúc): Mức giá thuộc nhóm cực hiếm, cần cẩn trọng.")
+                else:
+                    st.success("✅ Lớp 3 (Phân khúc): An toàn.")
+                
+                if anomaly_rf:
+                    st.error("❌ Lớp 4 (AI Thẩm định): Giá không tương xứng với tiện ích/vị trí nhà.")
+                else:
+                    st.success("✅ Lớp 4 (AI Thẩm định): Giá tương xứng với tiện ích nhà.")
+            
+            st.markdown("---")
+            st.subheader("💡 Lời khuyên cho bạn")
+            
+            reasons = []
+            if anomaly_zscore:
+                reasons.append("• **Về mặt bằng chung:** Mức giá này đang chênh lệch rất bất thường so với mức giá trung bình của toàn khu vực.")
+            if anomaly_minmax:
+                reasons.append(f"• **Về đơn giá:** Mức giá {price_m2:.2f} tỷ/m² là mức giá phi thực tế hoặc rất hiếm gặp trên thị trường hiện nay.")
+            if anomaly_percentile:
+                reasons.append("• **Về phân khúc:** Giao dịch này có dấu hiệu bị 'thổi giá' (nếu quá cao) hoặc có vấn đề nghiêm trọng về pháp lý/quy hoạch (nếu quá thấp).")
+            if anomaly_rf:
+                reasons.append("• **Về giá trị thực:** Trí tuệ nhân tạo đánh giá rằng với diện tích, vị trí và tiện ích như trên, căn nhà không thể có mức giá này.")
+            
+            if reasons:
+                for reason in reasons:
+                    st.write(reason)
+                st.warning("⚠️ **Khuyến nghị:** Bạn nên đến xem xét trực tiếp tài sản, kiểm tra kỹ giấy tờ pháp lý, quy hoạch và tham khảo thêm ý kiến chuyên gia trước khi xuống tiền.")
+            else:
+                st.write("✅ Mọi chỉ số đều nằm trong vùng an toàn. Bạn có thể tự tin tiến hành các bước tiếp theo của giao dịch.")
+            
+        except Exception as e:
+            st.error("⚠️ Vui lòng kiểm tra lại các thông tin đã nhập.")
+
+# Team Info
+else:
+    st.title("👥 Đội ngũ phát triển")
+    
+    st.write("""
+    Hệ thống được nghiên cứu và phát triển bởi đội ngũ đam mê ứng dụng Trí tuệ nhân tạo vào giải quyết các bài toán thực tế của xã hội.
+    
+    ### 👨‍💻 Thành viên dự án:
+    1. **Huỳnh Lê Xuân Ánh** - *Kỹ sư Dữ liệu & Phát triển Mô hình AI*
+    2. **Nguyễn Thị Tuyết Vân** - *Chuyên gia Xử lý Dữ liệu lớn (Big Data)*
+    3. **Đặng Đức Duy** - *Chuyên gia Phân tích Rủi ro & Trải nghiệm người dùng*
+    
+    ### ⚙️ Công nghệ nền tảng:
+    Hệ thống của chúng tôi được xây dựng trên các công nghệ tiên tiến nhất hiện nay:
+    - Lõi Trí tuệ nhân tạo (Machine Learning) để học hỏi từ hàng chục ngàn giao dịch thực tế.
+    - Công nghệ xử lý Dữ liệu lớn (Big Data) giúp phân tích thị trường theo thời gian thực.
+    - Giao diện tương tác thông minh, thân thiện với người dùng.
+    
+    *Dự án thuộc khuôn khổ môn học Machine Learning.*
+    """)
