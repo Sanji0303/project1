@@ -35,17 +35,17 @@ with st.sidebar:
     st.markdown("---")
     st.subheader("👥 Đội ngũ phát triển")
     st.markdown("""
-    **1. Huỳnh Lê Xuân Ánh**  
-    *Kỹ sư Dữ liệu & Phát triển AI*
-    *Contact:  huynhlexuananh2002@gmail.com*
+    - **1. Huỳnh Lê Xuân Ánh**  
+    - *Kỹ sư Dữ liệu & Phát triển AI*
+    - *Contact:  huynhlexuananh2002@gmail.com*
     
-    **2. Nguyễn Thị Tuyết Vân**  
-    *Chuyên gia Xử lý Dữ liệu lớn*
-     *Contact:  tuyetvan1418393@gmail.com*
+    - **2. Nguyễn Thị Tuyết Vân**  
+    - *Chuyên gia Xử lý Dữ liệu lớn*
+    - *Contact:  tuyetvan1418393@gmail.com*
     
-    **3. Đặng Đức Duy**  
-    *Chuyên gia Phân tích Rủi ro*
-     *Contact:  duydd1411@gmail.com*
+    - **3. Đặng Đức Duy**  
+    - *Chuyên gia Phân tích Rủi ro*
+    - *Contact:  duydd1411@gmail.com*
     
     """)
 
